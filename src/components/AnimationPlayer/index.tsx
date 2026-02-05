@@ -6,20 +6,18 @@ import { ErrorDisplay, type ErrorType } from "../ErrorDisplay";
 import { RenderControls } from "./RenderControls";
 import { SettingsModal } from "./SettingsModal";
 
-const errorTitles: Record<ErrorType, string> = {
-  validation: "Invalid Prompt",
-  api: "API Error",
-  compilation: "Compilation Error",
-};
-
 const renderErrorFallback: ErrorFallback = ({ error }) => {
   return (
-    <ErrorDisplay
-      error={error.message || "An error occurred while rendering"}
-      title="Runtime Error"
-      variant="fullscreen"
-      size="lg"
-    />
+    <div className="w-full h-full flex justify-center items-center bg-background-error p-10">
+      <div className="text-center max-w-[80%]">
+        <div className="text-destructive text-3xl font-bold mb-4 font-sans">
+          Runtime Error
+        </div>
+        <div className="text-destructive-foreground text-xl font-mono whitespace-pre-wrap break-words">
+          {error.message || "An error occurred while rendering"}
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -109,14 +107,7 @@ export const AnimationPlayer: React.FC<AnimationPlayerProps> = ({
     }
 
     if (error) {
-      return (
-        <ErrorDisplay
-          error={error}
-          title={errorTitles[errorType]}
-          variant="fullscreen"
-          size="lg"
-        />
-      );
+      return <ErrorDisplay error={error} errorType={errorType} />;
     }
 
     if (!Component) {
@@ -151,7 +142,7 @@ export const AnimationPlayer: React.FC<AnimationPlayerProps> = ({
             clickToPlay={false}
           />
         </div>
-        <div className="flex items-center justify-between gap-6 mt-4">
+        <div className="flex items-center justify-between gap-6">
           <RenderControls code={code} durationInFrames={durationInFrames} fps={fps} />
           <SettingsModal
             durationInFrames={durationInFrames}
@@ -166,7 +157,10 @@ export const AnimationPlayer: React.FC<AnimationPlayerProps> = ({
 
   return (
     <div className="flex flex-col bg-background min-w-0 h-full">
-      <div className="w-full h-full flex flex-col">
+      <div className="w-full h-full flex flex-col gap-3">
+        <h2 className="text-sm font-medium text-muted-foreground shrink-0">
+          Video Preview
+        </h2>
         {renderContent()}
       </div>
     </div>

@@ -249,8 +249,6 @@ function applyEdits(
 interface ConversationContextMessage {
   role: "user" | "assistant";
   content: string;
-  /** For user messages, attached images as base64 data URLs */
-  attachedImages?: string[];
 }
 
 interface ErrorCorrectionContext {
@@ -393,13 +391,7 @@ export async function POST(req: Request) {
         conversationContext =
           "\n\n## RECENT CONVERSATION:\n" +
           contextMessages
-            .map((m) => {
-              const imageNote =
-                m.attachedImages && m.attachedImages.length > 0
-                  ? ` [with ${m.attachedImages.length} attached image${m.attachedImages.length > 1 ? "s" : ""}]`
-                  : "";
-              return `${m.role.toUpperCase()}: ${m.content}${imageNote}`;
-            })
+            .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
             .join("\n");
       }
 
