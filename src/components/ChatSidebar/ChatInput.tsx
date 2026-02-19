@@ -203,7 +203,7 @@ export function ChatInput({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,video/*,audio/*"
+            accept="image/*,video/*,audio/*,.mp4,.webm,.mov,.mp3,.wav,.ogg,.aac"
             multiple
             onChange={handleFileSelect}
             className="hidden"
