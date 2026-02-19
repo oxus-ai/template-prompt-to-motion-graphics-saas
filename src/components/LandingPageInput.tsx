@@ -13,9 +13,11 @@ import { examplePrompts } from "@/examples/prompts";
 import { useMediaAttachments } from "@/hooks/useMediaAttachments";
 import { MODELS, type ModelId } from "@/types/generation";
 import {
+  ArrowRight,
   ArrowUp,
   BarChart3,
   Disc,
+  Film,
   Hash,
   MessageCircle,
   Paperclip,
@@ -251,8 +253,19 @@ export function LandingPageInput({
           })}
         </div>
 
+        <div className="flex justify-center mt-4">
+          <Link
+            href="/generate"
+            className="inline-flex items-center gap-2 rounded-lg border border-border/50 bg-background-elevated/50 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+          >
+            <Film className="w-4 h-4" />
+            <span>To upload videos, audio, or images, proceed to the editor</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
         {showCodeExamplesLink && (
-          <div className="flex justify-center mt-4">
+          <div className="flex justify-center mt-3">
             <Link
               href="/code-examples"
               className="text-muted-foreground-dim hover:text-muted-foreground text-xs transition-colors flex items-center gap-1"
