@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { useGenerationApi } from "@/hooks/useGenerationApi";
 import { cn } from "@/lib/utils";
+import type { AttachedFile } from "@/hooks/useMediaAttachments";
 import type {
   AssistantMetadata,
   ConversationContextMessage,
@@ -32,6 +33,7 @@ export interface ChatSidebarRef {
   triggerGeneration: (options?: {
     silent?: boolean;
     attachedImages?: string[];
+    attachedFiles?: AttachedFile[];
   }) => void;
 }
 
@@ -123,11 +125,25 @@ export const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(
     const handleGeneration = async (options?: {
       silent?: boolean;
       attachedImages?: string[];
+      attachedFiles?: AttachedFile[];
     }) => {
       const currentPrompt = promptRef.current;
       if (!currentPrompt.trim()) return;
 
       onPromptChange(""); // Clear input immediately
+
+      // Extract base64 images for LLM visual context
+      const frameImages =
+        options?.attachedImages ||
+        options?.attachedFiles
+          ?.filter((f) => f.type === "image" && f.base64)
+          .map((f) => f.base64 as string);
+
+      // Extract asset metadata for LLM prompt context
+      const availableAssets = options?.attachedFiles?.map((f) => ({
+        name: f.name,
+        type: f.type,
+      }));
 
       await runGeneration(
         currentPrompt,
@@ -139,7 +155,8 @@ export const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(
           isFollowUp,
           hasManualEdits,
           errorCorrection,
-          frameImages: options?.attachedImages,
+          frameImages,
+          availableAssets,
         },
         {
           onCodeGenerated,
@@ -229,8 +246,8 @@ export const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(
               model={model}
               onModelChange={setModel}
               isLoading={isLoading}
-              onSubmit={(attachedImages) =>
-                handleGeneration({ attachedImages })
+              onSubmit={(attachedFiles) =>
+                handleGeneration({ attachedFiles })
               }
               Component={Component}
               fps={fps}

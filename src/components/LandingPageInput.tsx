@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { examplePrompts } from "@/examples/prompts";
-import { useImageAttachments } from "@/hooks/useImageAttachments";
+import { useMediaAttachments } from "@/hooks/useMediaAttachments";
 import { MODELS, type ModelId } from "@/types/generation";
 import {
   ArrowUp,
@@ -53,10 +53,10 @@ export function LandingPageInput({
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState<ModelId>("gpt-5.2-codex:medium");
   const {
-    attachedImages,
+    attachedFiles,
     isDragging,
     fileInputRef,
-    removeImage,
+    removeFile,
     handleFileSelect,
     handlePaste,
     handleDragOver,
@@ -65,7 +65,7 @@ export function LandingPageInput({
     canAddMore,
     error,
     clearError,
-  } = useImageAttachments();
+  } = useMediaAttachments();
 
   // Auto-clear error after 5 seconds
   useEffect(() => {
@@ -78,10 +78,14 @@ export function LandingPageInput({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isNavigating) return;
+    // Extract base64 for images (landing page only supports images via sessionStorage)
+    const imageBase64s = attachedFiles
+      .filter((f) => f.type === "image" && f.base64)
+      .map((f) => f.base64 as string);
     onNavigate(
       prompt,
       model,
-      attachedImages.length > 0 ? attachedImages : undefined,
+      imageBase64s.length > 0 ? imageBase64s : undefined,
     );
   };
 
@@ -120,19 +124,27 @@ export function LandingPageInput({
           )}
 
           {/* Image previews */}
-          {attachedImages.length > 0 && (
+          {attachedFiles.length > 0 && (
             <div className="mb-3 flex gap-2 overflow-x-auto pb-1 pt-2">
-              {attachedImages.map((img, index) => (
+              {attachedFiles.map((file, index) => (
                 <div key={index} className="relative flex-shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img}
-                    alt={`Attached ${index + 1}`}
-                    className="h-20 w-auto rounded border border-border object-cover"
-                  />
+                  {file.base64 ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={file.base64}
+                      alt={file.name}
+                      className="h-20 w-auto rounded border border-border object-cover"
+                    />
+                  ) : (
+                    <div className="h-20 w-20 rounded border border-border bg-secondary/50 flex items-center justify-center">
+                      <span className="text-xs text-muted-foreground truncate px-1">
+                        {file.name}
+                      </span>
+                    </div>
+                  )}
                   <button
                     type="button"
-                    onClick={() => removeImage(index)}
+                    onClick={() => removeFile(index)}
                     className="absolute -top-1.5 -right-1.5 bg-background border border-border rounded-full p-0.5 hover:bg-destructive hover:text-destructive-foreground transition-colors"
                   >
                     <X className="w-3 h-3" />
