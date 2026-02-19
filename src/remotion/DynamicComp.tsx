@@ -21,7 +21,7 @@ export const DynamicComp: React.FC = () => {
 
   useEffect(() => {
     try {
-      const result = compileCode(code);
+      const result = compileCode(code, {});
 
       if (result.error) {
         setError(result.error);
