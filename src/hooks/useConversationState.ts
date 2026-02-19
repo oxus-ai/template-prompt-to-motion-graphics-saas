@@ -4,6 +4,7 @@ import type {
   ConversationMessage,
   ConversationState,
   EditOperation,
+  MediaAttachmentMeta,
 } from "@/types/conversation";
 import { useCallback, useRef, useState } from "react";
 
@@ -19,13 +20,18 @@ export function useConversationState() {
   const lastAiCodeRef = useRef<string>("");
 
   const addUserMessage = useCallback(
-    (content: string, attachedImages?: string[]) => {
+    (
+      content: string,
+      attachedImages?: string[],
+      attachedMedia?: MediaAttachmentMeta[],
+    ) => {
       const message: ConversationMessage = {
         id: `user-${Date.now()}`,
         role: "user",
         content,
         timestamp: Date.now(),
         attachedImages,
+        attachedMedia,
       };
       setState((prev) => ({
         ...prev,

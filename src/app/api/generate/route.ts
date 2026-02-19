@@ -76,7 +76,7 @@ This allows users to easily customize the animation.
 ## AVAILABLE IMPORTS
 
 \`\`\`tsx
-import { useCurrentFrame, useVideoConfig, AbsoluteFill, interpolate, spring, Sequence } from "remotion";
+import { useCurrentFrame, useVideoConfig, AbsoluteFill, interpolate, spring, Sequence, Img, OffthreadVideo, Audio, Video } from "remotion";
 import { TransitionSeries, linearTiming, springTiming } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import { slide } from "@remotion/transitions/slide";
@@ -84,6 +84,16 @@ import { Circle, Rect, Triangle, Star, Ellipse, Pie } from "@remotion/shapes";
 import { ThreeCanvas } from "@remotion/three";
 import { useState, useEffect } from "react";
 \`\`\`
+
+## MEDIA ASSETS
+
+When the user uploads media files, they are available via the \`ASSETS\` object.
+- Access files by name: \`ASSETS['filename.ext']\` returns a URL string
+- Use \`<Img src={ASSETS['photo.png']} />\` for images
+- Use \`<OffthreadVideo src={ASSETS['video.mp4']} />\` for videos
+- Use \`<Audio src={ASSETS['music.mp3']} />\` for audio
+- ONLY use ASSETS when the user has uploaded files (listed in the prompt)
+- Do NOT reference ASSETS if no files are listed
 
 ## RESERVED NAMES (CRITICAL)
 
@@ -281,6 +291,8 @@ interface GenerateRequest {
   previouslyUsedSkills?: string[];
   /** Base64 image data URLs for visual context */
   frameImages?: string[];
+  /** Metadata about uploaded media files available via ASSETS */
+  availableAssets?: Array<{ name: string; type: string }>;
 }
 
 interface GenerateResponse {
@@ -305,6 +317,7 @@ export async function POST(req: Request) {
     errorCorrection,
     previouslyUsedSkills = [],
     frameImages,
+    availableAssets,
   }: GenerateRequest = await req.json();
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -386,9 +399,31 @@ export async function POST(req: Request) {
 
   // Load skill-specific content only for NEW skills (previously used skills are already in context)
   const skillContent = getCombinedSkillContent(newSkills as SkillName[]);
-  const enhancedSystemPrompt = skillContent
-    ? `${SYSTEM_PROMPT}\n\n## SKILL-SPECIFIC GUIDANCE\n${skillContent}`
-    : SYSTEM_PROMPT;
+
+  // Build asset context for LLM
+  let assetContext = "";
+  if (availableAssets && availableAssets.length > 0) {
+    const componentMap: Record<string, string> = {
+      image: "<Img>",
+      video: "<OffthreadVideo>",
+      audio: "<Audio>",
+    };
+    const assetLines = availableAssets
+      .map(
+        (a) =>
+          `- ${a.name} (${a.type}) → use with ${componentMap[a.type] || "<Img>"} src={ASSETS['${a.name}']}`,
+      )
+      .join("\n");
+    assetContext = `\n\n## AVAILABLE MEDIA ASSETS\nThe user has uploaded the following files. Access them via the ASSETS object.\n\n${assetLines}\n\nOnly use these assets if the user's request implies they should be incorporated.`;
+  }
+
+  let enhancedSystemPrompt = SYSTEM_PROMPT;
+  if (skillContent) {
+    enhancedSystemPrompt += `\n\n## SKILL-SPECIFIC GUIDANCE\n${skillContent}`;
+  }
+  if (assetContext) {
+    enhancedSystemPrompt += assetContext;
+  }
 
   // FOLLOW-UP MODE: Use non-streaming generateObject for faster edits
   if (isFollowUp && currentCode) {
@@ -509,9 +544,13 @@ Analyze the request and decide: use targeted edits (type: "edit") for small chan
         },
       ];
 
+      const followUpSystem = assetContext
+        ? `${FOLLOW_UP_SYSTEM_PROMPT}${assetContext}`
+        : FOLLOW_UP_SYSTEM_PROMPT;
+
       const editResult = await generateObject({
         model: openai(modelName),
-        system: FOLLOW_UP_SYSTEM_PROMPT,
+        system: followUpSystem,
         messages: editMessages,
         schema: FollowUpResponseSchema,
       });

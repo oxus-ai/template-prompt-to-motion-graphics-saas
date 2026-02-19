@@ -74,6 +74,12 @@ interface ChatSidebarProps {
   errorCorrection?: ErrorCorrectionContext;
   onPendingMessage?: (skills?: string[]) => void;
   onClearPendingMessage?: () => void;
+  /** Callback when media files are attached — adds them to the media assets map, returns resolved assets */
+  onFilesAttached?: (
+    files: File[],
+  ) => Array<{ name: string; type: string }>;
+  /** Current cumulative list of all available asset metadata for the LLM */
+  allAvailableAssets?: Array<{ name: string; type: string }>;
   // Frame capture props
   Component?: ComponentType | null;
   fps?: number;
@@ -105,6 +111,8 @@ export const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(
       errorCorrection,
       onPendingMessage,
       onClearPendingMessage,
+      onFilesAttached,
+      allAvailableAssets,
       Component,
       fps = 30,
       durationInFrames = 150,
@@ -132,6 +140,17 @@ export const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(
 
       onPromptChange(""); // Clear input immediately
 
+      // Add files to the media assets map (creates blob URLs) and get resolved names
+      let newAssetMeta: Array<{ name: string; type: string }> = [];
+      if (options?.attachedFiles && options.attachedFiles.length > 0) {
+        const rawFiles = options.attachedFiles
+          .map((f) => f.file)
+          .filter((f) => f.size > 0);
+        if (rawFiles.length > 0 && onFilesAttached) {
+          newAssetMeta = onFilesAttached(rawFiles);
+        }
+      }
+
       // Extract base64 images for LLM visual context
       const frameImages =
         options?.attachedImages ||
@@ -139,11 +158,12 @@ export const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(
           ?.filter((f) => f.type === "image" && f.base64)
           .map((f) => f.base64 as string);
 
-      // Extract asset metadata for LLM prompt context
-      const availableAssets = options?.attachedFiles?.map((f) => ({
-        name: f.name,
-        type: f.type,
-      }));
+      // Merge existing + newly added assets for the LLM context
+      const existingAssets = allAvailableAssets || [];
+      const availableAssets =
+        existingAssets.length > 0 || newAssetMeta.length > 0
+          ? [...existingAssets, ...newAssetMeta]
+          : undefined;
 
       await runGeneration(
         currentPrompt,
