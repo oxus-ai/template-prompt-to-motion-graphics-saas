@@ -3,7 +3,6 @@
 import { Player, type ErrorFallback, type PlayerRef } from "@remotion/player";
 import React, { useEffect, useRef } from "react";
 import { ErrorDisplay, type ErrorType } from "../ErrorDisplay";
-import { RenderControls } from "./RenderControls";
 import { SettingsModal } from "./SettingsModal";
 
 const errorTitles: Record<ErrorType, string> = {
@@ -150,11 +149,6 @@ export const AnimationPlayer: React.FC<AnimationPlayerProps> = ({
           />
         </div>
         <div className="flex items-center justify-between gap-6 mt-4">
-          <RenderControls
-            code={code}
-            durationInFrames={durationInFrames}
-            fps={fps}
-          />
           <SettingsModal
             durationInFrames={durationInFrames}
             onDurationChange={onDurationChange}

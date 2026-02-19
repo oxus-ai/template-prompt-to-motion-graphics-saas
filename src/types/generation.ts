@@ -1,4 +1,8 @@
 export const MODELS = [
+  { id: "gpt-5.2-codex:none", name: "GPT-5.2 Codex (No Reasoning)" },
+  { id: "gpt-5.2-codex:low", name: "GPT-5.2 Codex (Low Reasoning)" },
+  { id: "gpt-5.2-codex:medium", name: "GPT-5.2 Codex (Medium Reasoning)" },
+  { id: "gpt-5.2-codex:high", name: "GPT-5.2 Codex (High Reasoning)" },
   { id: "gpt-5.2:none", name: "GPT-5.2 (No Reasoning)" },
   { id: "gpt-5.2:low", name: "GPT-5.2 (Low Reasoning)" },
   { id: "gpt-5.2:medium", name: "GPT-5.2 (Medium Reasoning)" },
