@@ -20,7 +20,6 @@ import {
   Film,
   Hash,
   MessageCircle,
-  Paperclip,
   SquareArrowOutUpRight,
   Type,
   X,
@@ -57,14 +56,11 @@ export function LandingPageInput({
   const {
     attachedFiles,
     isDragging,
-    fileInputRef,
     removeFile,
-    handleFileSelect,
     handlePaste,
     handleDragOver,
     handleDragLeave,
     handleDrop,
-    canAddMore,
     error,
     clearError,
   } = useMediaAttachments();
@@ -171,16 +167,6 @@ export function LandingPageInput({
             disabled={isNavigating}
           />
 
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-
           <div className="flex justify-between items-center mt-3 pt-3 border-t border-border">
             <Select
               value={model}
@@ -204,18 +190,6 @@ export function LandingPageInput({
             </Select>
 
             <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isNavigating || !canAddMore}
-                className="text-muted-foreground hover:text-foreground"
-                title="Attach images"
-              >
-                <Paperclip className="w-5 h-5" />
-              </Button>
-
               <Button
                 type="submit"
                 size="icon-sm"
@@ -256,7 +230,7 @@ export function LandingPageInput({
         <div className="flex justify-center mt-4">
           <Link
             href="/generate"
-            className="inline-flex items-center gap-2 rounded-lg border border-border/50 bg-background-elevated/50 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg border border-orange-500/50 bg-orange-500/15 px-4 py-2.5 text-sm text-orange-400 hover:bg-orange-500/25 hover:border-orange-500 hover:text-orange-300 transition-colors"
           >
             <Film className="w-4 h-4" />
             <span>To upload videos, audio, or images, proceed to the editor</span>

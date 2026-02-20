@@ -92,8 +92,9 @@ When the user uploads media files, they are available via the \`ASSETS\` object.
 - Use \`<Img src={ASSETS['photo.png']} />\` for images
 - Use \`<OffthreadVideo src={ASSETS['video.mp4']} />\` for videos
 - Use \`<Audio src={ASSETS['music.mp3']} />\` for audio
-- ONLY use ASSETS when the user has uploaded files (listed in the prompt)
-- Do NOT reference ASSETS if no files are listed
+- When uploaded files are listed, you MUST use ASSETS to reference them
+- NEVER use hardcoded URLs or placeholder URLs when uploaded files are available
+- Do NOT reference ASSETS if no uploaded files are listed
 
 ## RESERVED NAMES (CRITICAL)
 
@@ -401,6 +402,9 @@ export async function POST(req: Request) {
   const skillContent = getCombinedSkillContent(newSkills as SkillName[]);
 
   // Build asset context for LLM
+  if (availableAssets && availableAssets.length > 0) {
+    console.log("Available assets for LLM:", availableAssets);
+  }
   let assetContext = "";
   if (availableAssets && availableAssets.length > 0) {
     const componentMap: Record<string, string> = {
@@ -414,7 +418,17 @@ export async function POST(req: Request) {
           `- ${a.name} (${a.type}) → use with ${componentMap[a.type] || "<Img>"} src={ASSETS['${a.name}']}`,
       )
       .join("\n");
-    assetContext = `\n\n## AVAILABLE MEDIA ASSETS\nThe user has uploaded the following files. Access them via the ASSETS object.\n\n${assetLines}\n\nOnly use these assets if the user's request implies they should be incorporated.`;
+    assetContext = `\n\n## AVAILABLE MEDIA ASSETS (CRITICAL)
+The user has uploaded the following files. They are available via the ASSETS object.
+
+${assetLines}
+
+IMPORTANT RULES:
+- When the user refers to "my files", "the videos", "these images", "the uploaded files", etc., they mean the files listed above.
+- You MUST use ASSETS['filename'] to reference these files. NEVER substitute hardcoded URLs, placeholder URLs, or sample content.
+- NEVER use URLs like https://storage.googleapis.com/... or any other external URL as a substitute for uploaded files.
+- If the user asks to use/show/play their uploaded media, use the exact filenames from the list above.
+- Do NOT reference ASSETS if no files are listed above.`;
   }
 
   let enhancedSystemPrompt = SYSTEM_PROMPT;
@@ -497,6 +511,12 @@ Focus ONLY on fixing the error. Do not make other changes.`;
         }
       }
 
+      // Append uploaded asset filenames into user request so LLM connects references
+      const editAssetMention =
+        availableAssets && availableAssets.length > 0
+          ? `\n\nUploaded files available via ASSETS: ${availableAssets.map((a) => `${a.name} (${a.type})`).join(", ")}`
+          : "";
+
       const editPromptText = `## CURRENT CODE:
 \`\`\`tsx
 ${currentCode}
@@ -506,7 +526,7 @@ ${manualEditNotice}
 ${errorCorrectionNotice}
 
 ## USER REQUEST:
-${prompt}
+${prompt}${editAssetMention}
 ${frameImages && frameImages.length > 0 ? `\n(See the attached ${frameImages.length === 1 ? "image" : "images"} for visual reference)` : ""}
 
 Analyze the request and decide: use targeted edits (type: "edit") for small changes, or full replacement (type: "full") for major restructuring.`;
@@ -626,9 +646,13 @@ Analyze the request and decide: use targeted edits (type: "edit") for small chan
   try {
     // Build messages for initial generation (supports image references)
     const hasImages = frameImages && frameImages.length > 0;
-    const initialPromptText = hasImages
-      ? `${prompt}\n\n(See the attached ${frameImages.length === 1 ? "image" : "images"} for visual reference)`
-      : prompt;
+    // Append uploaded asset filenames directly into the user message so the LLM
+    // connects "these videos/images" with specific ASSETS keys
+    const assetMention =
+      availableAssets && availableAssets.length > 0
+        ? `\n\nUploaded files available via ASSETS: ${availableAssets.map((a) => `${a.name} (${a.type})`).join(", ")}`
+        : "";
+    const initialPromptText = `${prompt}${assetMention}${hasImages ? `\n\n(See the attached ${frameImages.length === 1 ? "image" : "images"} for visual reference)` : ""}`;
 
     const initialMessageContent: Array<
       { type: "text"; text: string } | { type: "image"; image: string }
