@@ -15,8 +15,11 @@ import { wipe } from "@remotion/transitions/wipe";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AbsoluteFill,
+  Audio,
   Img,
+  OffthreadVideo,
   Sequence,
+  Video,
   interpolate,
   spring,
   useCurrentFrame,
@@ -77,7 +80,10 @@ function extractComponentBody(code: string): string {
 }
 
 // Standalone compile function for use outside React components
-export function compileCode(code: string): CompilationResult {
+export function compileCode(
+  code: string,
+  assets: Record<string, string> = {},
+): CompilationResult {
   if (!code?.trim()) {
     return { Component: null, error: "No code provided" };
   }
@@ -103,6 +109,9 @@ export function compileCode(code: string): CompilationResult {
       spring,
       Sequence,
       Img,
+      OffthreadVideo,
+      Audio,
+      Video,
     };
 
     const wrappedCode = `${transpiled.code}\nreturn DynamicAnimation;`;
@@ -150,6 +159,11 @@ export function compileCode(code: string): CompilationResult {
       "wipe",
       "flip",
       "clockWipe",
+      // Media
+      "OffthreadVideo",
+      "Audio",
+      "Video",
+      "ASSETS",
       wrappedCode,
     );
 
@@ -196,6 +210,11 @@ export function compileCode(code: string): CompilationResult {
       wipe,
       flip,
       clockWipe,
+      // Media
+      OffthreadVideo,
+      Audio,
+      Video,
+      assets,
     );
 
     if (typeof Component !== "function") {

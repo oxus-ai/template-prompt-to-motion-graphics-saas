@@ -10,15 +10,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { examplePrompts } from "@/examples/prompts";
-import { useImageAttachments } from "@/hooks/useImageAttachments";
+import { useMediaAttachments } from "@/hooks/useMediaAttachments";
 import { MODELS, type ModelId } from "@/types/generation";
 import {
+  ArrowRight,
   ArrowUp,
   BarChart3,
   Disc,
+  Film,
   Hash,
   MessageCircle,
-  Paperclip,
   SquareArrowOutUpRight,
   Type,
   X,
@@ -53,19 +54,16 @@ export function LandingPageInput({
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState<ModelId>("gpt-5.2-codex:medium");
   const {
-    attachedImages,
+    attachedFiles,
     isDragging,
-    fileInputRef,
-    removeImage,
-    handleFileSelect,
+    removeFile,
     handlePaste,
     handleDragOver,
     handleDragLeave,
     handleDrop,
-    canAddMore,
     error,
     clearError,
-  } = useImageAttachments();
+  } = useMediaAttachments();
 
   // Auto-clear error after 5 seconds
   useEffect(() => {
@@ -78,10 +76,14 @@ export function LandingPageInput({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isNavigating) return;
+    // Extract base64 for images (landing page only supports images via sessionStorage)
+    const imageBase64s = attachedFiles
+      .filter((f) => f.type === "image" && f.base64)
+      .map((f) => f.base64 as string);
     onNavigate(
       prompt,
       model,
-      attachedImages.length > 0 ? attachedImages : undefined,
+      imageBase64s.length > 0 ? imageBase64s : undefined,
     );
   };
 
@@ -120,19 +122,27 @@ export function LandingPageInput({
           )}
 
           {/* Image previews */}
-          {attachedImages.length > 0 && (
+          {attachedFiles.length > 0 && (
             <div className="mb-3 flex gap-2 overflow-x-auto pb-1 pt-2">
-              {attachedImages.map((img, index) => (
+              {attachedFiles.map((file, index) => (
                 <div key={index} className="relative flex-shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img}
-                    alt={`Attached ${index + 1}`}
-                    className="h-20 w-auto rounded border border-border object-cover"
-                  />
+                  {file.base64 ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={file.base64}
+                      alt={file.name}
+                      className="h-20 w-auto rounded border border-border object-cover"
+                    />
+                  ) : (
+                    <div className="h-20 w-20 rounded border border-border bg-secondary/50 flex items-center justify-center">
+                      <span className="text-xs text-muted-foreground truncate px-1">
+                        {file.name}
+                      </span>
+                    </div>
+                  )}
                   <button
                     type="button"
-                    onClick={() => removeImage(index)}
+                    onClick={() => removeFile(index)}
                     className="absolute -top-1.5 -right-1.5 bg-background border border-border rounded-full p-0.5 hover:bg-destructive hover:text-destructive-foreground transition-colors"
                   >
                     <X className="w-3 h-3" />
@@ -155,16 +165,6 @@ export function LandingPageInput({
             className="w-full bg-transparent text-foreground placeholder:text-muted-foreground-dim focus:outline-none resize-none overflow-y-auto text-base min-h-[60px] max-h-[200px]"
             style={{ fieldSizing: "content" }}
             disabled={isNavigating}
-          />
-
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileSelect}
-            className="hidden"
           />
 
           <div className="flex justify-between items-center mt-3 pt-3 border-t border-border">
@@ -190,18 +190,6 @@ export function LandingPageInput({
             </Select>
 
             <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isNavigating || !canAddMore}
-                className="text-muted-foreground hover:text-foreground"
-                title="Attach images"
-              >
-                <Paperclip className="w-5 h-5" />
-              </Button>
-
               <Button
                 type="submit"
                 size="icon-sm"
@@ -239,8 +227,19 @@ export function LandingPageInput({
           })}
         </div>
 
+        <div className="flex justify-center mt-4">
+          <Link
+            href="/generate"
+            className="inline-flex items-center gap-2 rounded-lg border border-orange-500/50 bg-orange-500/15 px-4 py-2.5 text-sm text-orange-400 hover:bg-orange-500/25 hover:border-orange-500 hover:text-orange-300 transition-colors"
+          >
+            <Film className="w-4 h-4" />
+            <span>To upload videos, audio, or images, proceed to the editor</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
         {showCodeExamplesLink && (
-          <div className="flex justify-center mt-4">
+          <div className="flex justify-center mt-3">
             <Link
               href="/code-examples"
               className="text-muted-foreground-dim hover:text-muted-foreground text-xs transition-colors flex items-center gap-1"

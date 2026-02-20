@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { useGenerationApi } from "@/hooks/useGenerationApi";
 import { cn } from "@/lib/utils";
+import type { AttachedFile } from "@/hooks/useMediaAttachments";
 import type {
   AssistantMetadata,
   ConversationContextMessage,
@@ -32,6 +33,7 @@ export interface ChatSidebarRef {
   triggerGeneration: (options?: {
     silent?: boolean;
     attachedImages?: string[];
+    attachedFiles?: AttachedFile[];
   }) => void;
 }
 
@@ -72,6 +74,12 @@ interface ChatSidebarProps {
   errorCorrection?: ErrorCorrectionContext;
   onPendingMessage?: (skills?: string[]) => void;
   onClearPendingMessage?: () => void;
+  /** Callback when media files are attached — adds them to the media assets map, returns resolved assets */
+  onFilesAttached?: (
+    files: File[],
+  ) => Array<{ name: string; type: string }>;
+  /** Current cumulative list of all available asset metadata for the LLM */
+  allAvailableAssets?: Array<{ name: string; type: string }>;
   // Frame capture props
   Component?: ComponentType | null;
   fps?: number;
@@ -103,6 +111,8 @@ export const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(
       errorCorrection,
       onPendingMessage,
       onClearPendingMessage,
+      onFilesAttached,
+      allAvailableAssets,
       Component,
       fps = 30,
       durationInFrames = 150,
@@ -123,11 +133,37 @@ export const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(
     const handleGeneration = async (options?: {
       silent?: boolean;
       attachedImages?: string[];
+      attachedFiles?: AttachedFile[];
     }) => {
       const currentPrompt = promptRef.current;
       if (!currentPrompt.trim()) return;
 
       onPromptChange(""); // Clear input immediately
+
+      // Add files to the media assets map (creates blob URLs) and get resolved names
+      let newAssetMeta: Array<{ name: string; type: string }> = [];
+      if (options?.attachedFiles && options.attachedFiles.length > 0) {
+        const rawFiles = options.attachedFiles
+          .map((f) => f.file)
+          .filter((f) => f.size > 0);
+        if (rawFiles.length > 0 && onFilesAttached) {
+          newAssetMeta = onFilesAttached(rawFiles);
+        }
+      }
+
+      // Extract base64 images for LLM visual context
+      const frameImages =
+        options?.attachedImages ||
+        options?.attachedFiles
+          ?.filter((f) => f.type === "image" && f.base64)
+          .map((f) => f.base64 as string);
+
+      // Merge existing + newly added assets for the LLM context
+      const existingAssets = allAvailableAssets || [];
+      const availableAssets =
+        existingAssets.length > 0 || newAssetMeta.length > 0
+          ? [...existingAssets, ...newAssetMeta]
+          : undefined;
 
       await runGeneration(
         currentPrompt,
@@ -139,7 +175,8 @@ export const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(
           isFollowUp,
           hasManualEdits,
           errorCorrection,
-          frameImages: options?.attachedImages,
+          frameImages,
+          availableAssets,
         },
         {
           onCodeGenerated,
@@ -229,8 +266,8 @@ export const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(
               model={model}
               onModelChange={setModel}
               isLoading={isLoading}
-              onSubmit={(attachedImages) =>
-                handleGeneration({ attachedImages })
+              onSubmit={(attachedFiles) =>
+                handleGeneration({ attachedFiles })
               }
               Component={Component}
               fps={fps}

@@ -76,7 +76,7 @@ This allows users to easily customize the animation.
 ## AVAILABLE IMPORTS
 
 \`\`\`tsx
-import { useCurrentFrame, useVideoConfig, AbsoluteFill, interpolate, spring, Sequence } from "remotion";
+import { useCurrentFrame, useVideoConfig, AbsoluteFill, interpolate, spring, Sequence, Img, OffthreadVideo, Audio, Video } from "remotion";
 import { TransitionSeries, linearTiming, springTiming } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import { slide } from "@remotion/transitions/slide";
@@ -84,6 +84,17 @@ import { Circle, Rect, Triangle, Star, Ellipse, Pie } from "@remotion/shapes";
 import { ThreeCanvas } from "@remotion/three";
 import { useState, useEffect } from "react";
 \`\`\`
+
+## MEDIA ASSETS
+
+When the user uploads media files, they are available via the \`ASSETS\` object.
+- Access files by name: \`ASSETS['filename.ext']\` returns a URL string
+- Use \`<Img src={ASSETS['photo.png']} />\` for images
+- Use \`<OffthreadVideo src={ASSETS['video.mp4']} />\` for videos
+- Use \`<Audio src={ASSETS['music.mp3']} />\` for audio
+- When uploaded files are listed, you MUST use ASSETS to reference them
+- NEVER use hardcoded URLs or placeholder URLs when uploaded files are available
+- Do NOT reference ASSETS if no uploaded files are listed
 
 ## RESERVED NAMES (CRITICAL)
 
@@ -281,6 +292,8 @@ interface GenerateRequest {
   previouslyUsedSkills?: string[];
   /** Base64 image data URLs for visual context */
   frameImages?: string[];
+  /** Metadata about uploaded media files available via ASSETS */
+  availableAssets?: Array<{ name: string; type: string }>;
 }
 
 interface GenerateResponse {
@@ -305,6 +318,7 @@ export async function POST(req: Request) {
     errorCorrection,
     previouslyUsedSkills = [],
     frameImages,
+    availableAssets,
   }: GenerateRequest = await req.json();
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -386,9 +400,44 @@ export async function POST(req: Request) {
 
   // Load skill-specific content only for NEW skills (previously used skills are already in context)
   const skillContent = getCombinedSkillContent(newSkills as SkillName[]);
-  const enhancedSystemPrompt = skillContent
-    ? `${SYSTEM_PROMPT}\n\n## SKILL-SPECIFIC GUIDANCE\n${skillContent}`
-    : SYSTEM_PROMPT;
+
+  // Build asset context for LLM
+  if (availableAssets && availableAssets.length > 0) {
+    console.log("Available assets for LLM:", availableAssets);
+  }
+  let assetContext = "";
+  if (availableAssets && availableAssets.length > 0) {
+    const componentMap: Record<string, string> = {
+      image: "<Img>",
+      video: "<OffthreadVideo>",
+      audio: "<Audio>",
+    };
+    const assetLines = availableAssets
+      .map(
+        (a) =>
+          `- ${a.name} (${a.type}) → use with ${componentMap[a.type] || "<Img>"} src={ASSETS['${a.name}']}`,
+      )
+      .join("\n");
+    assetContext = `\n\n## AVAILABLE MEDIA ASSETS (CRITICAL)
+The user has uploaded the following files. They are available via the ASSETS object.
+
+${assetLines}
+
+IMPORTANT RULES:
+- When the user refers to "my files", "the videos", "these images", "the uploaded files", etc., they mean the files listed above.
+- You MUST use ASSETS['filename'] to reference these files. NEVER substitute hardcoded URLs, placeholder URLs, or sample content.
+- NEVER use URLs like https://storage.googleapis.com/... or any other external URL as a substitute for uploaded files.
+- If the user asks to use/show/play their uploaded media, use the exact filenames from the list above.
+- Do NOT reference ASSETS if no files are listed above.`;
+  }
+
+  let enhancedSystemPrompt = SYSTEM_PROMPT;
+  if (skillContent) {
+    enhancedSystemPrompt += `\n\n## SKILL-SPECIFIC GUIDANCE\n${skillContent}`;
+  }
+  if (assetContext) {
+    enhancedSystemPrompt += assetContext;
+  }
 
   // FOLLOW-UP MODE: Use non-streaming generateObject for faster edits
   if (isFollowUp && currentCode) {
@@ -462,6 +511,12 @@ Focus ONLY on fixing the error. Do not make other changes.`;
         }
       }
 
+      // Append uploaded asset filenames into user request so LLM connects references
+      const editAssetMention =
+        availableAssets && availableAssets.length > 0
+          ? `\n\nUploaded files available via ASSETS: ${availableAssets.map((a) => `${a.name} (${a.type})`).join(", ")}`
+          : "";
+
       const editPromptText = `## CURRENT CODE:
 \`\`\`tsx
 ${currentCode}
@@ -471,7 +526,7 @@ ${manualEditNotice}
 ${errorCorrectionNotice}
 
 ## USER REQUEST:
-${prompt}
+${prompt}${editAssetMention}
 ${frameImages && frameImages.length > 0 ? `\n(See the attached ${frameImages.length === 1 ? "image" : "images"} for visual reference)` : ""}
 
 Analyze the request and decide: use targeted edits (type: "edit") for small changes, or full replacement (type: "full") for major restructuring.`;
@@ -509,9 +564,13 @@ Analyze the request and decide: use targeted edits (type: "edit") for small chan
         },
       ];
 
+      const followUpSystem = assetContext
+        ? `${FOLLOW_UP_SYSTEM_PROMPT}${assetContext}`
+        : FOLLOW_UP_SYSTEM_PROMPT;
+
       const editResult = await generateObject({
         model: openai(modelName),
-        system: FOLLOW_UP_SYSTEM_PROMPT,
+        system: followUpSystem,
         messages: editMessages,
         schema: FollowUpResponseSchema,
       });
@@ -587,9 +646,13 @@ Analyze the request and decide: use targeted edits (type: "edit") for small chan
   try {
     // Build messages for initial generation (supports image references)
     const hasImages = frameImages && frameImages.length > 0;
-    const initialPromptText = hasImages
-      ? `${prompt}\n\n(See the attached ${frameImages.length === 1 ? "image" : "images"} for visual reference)`
-      : prompt;
+    // Append uploaded asset filenames directly into the user message so the LLM
+    // connects "these videos/images" with specific ASSETS keys
+    const assetMention =
+      availableAssets && availableAssets.length > 0
+        ? `\n\nUploaded files available via ASSETS: ${availableAssets.map((a) => `${a.name} (${a.type})`).join(", ")}`
+        : "";
+    const initialPromptText = `${prompt}${assetMention}${hasImages ? `\n\n(See the attached ${frameImages.length === 1 ? "image" : "images"} for visual reference)` : ""}`;
 
     const initialMessageContent: Array<
       { type: "text"; text: string } | { type: "image"; image: string }

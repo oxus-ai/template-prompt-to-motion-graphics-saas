@@ -6,7 +6,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { ConversationMessage } from "@/types/conversation";
-import { AlertTriangle, BookOpen, FileCode, PenLine } from "lucide-react";
+import {
+  AlertTriangle,
+  BookOpen,
+  FileCode,
+  Film,
+  Music,
+  PenLine,
+} from "lucide-react";
 import { useEffect, useRef } from "react";
 
 interface ChatHistoryProps {
@@ -65,6 +72,25 @@ function ChatMessage({ message }: { message: ConversationMessage }) {
                   alt={`Attached ${index + 1}`}
                   className="h-20 w-auto rounded border border-border object-cover flex-shrink-0"
                 />
+              ))}
+            </div>
+          )}
+          {message.attachedMedia && message.attachedMedia.length > 0 && (
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {message.attachedMedia.map((media, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-1.5 rounded border border-border bg-secondary/30 px-2 py-1"
+                >
+                  {media.type === "video" ? (
+                    <Film className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  ) : media.type === "audio" ? (
+                    <Music className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  ) : null}
+                  <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                    {media.name}
+                  </span>
+                </div>
               ))}
             </div>
           )}

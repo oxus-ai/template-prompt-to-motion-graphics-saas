@@ -30,7 +30,11 @@ interface GenerationCallbacks {
     type: GenerationErrorType,
     failedEdit?: FailedEditInfo,
   ) => void;
-  onMessageSent?: (prompt: string, attachedImages?: string[]) => void;
+  onMessageSent?: (
+    prompt: string,
+    attachedImages?: string[],
+    attachedMedia?: Array<{ name: string; type: string }>,
+  ) => void;
   onGenerationComplete?: (
     code: string,
     summary?: string,
@@ -53,6 +57,7 @@ interface GenerationContext {
   hasManualEdits: boolean;
   errorCorrection?: ErrorCorrectionContext;
   frameImages?: string[];
+  availableAssets?: Array<{ name: string; type: string }>;
 }
 
 interface UseGenerationApiReturn {
@@ -87,6 +92,7 @@ export function useGenerationApi(): UseGenerationApiReturn {
         hasManualEdits,
         errorCorrection,
         frameImages,
+        availableAssets,
       } = context;
 
       const {
@@ -107,7 +113,7 @@ export function useGenerationApi(): UseGenerationApiReturn {
 
       // Only add user message if not a silent retry
       if (!options?.silent) {
-        onMessageSent?.(prompt, frameImages);
+        onMessageSent?.(prompt, frameImages, availableAssets);
       }
 
       try {
@@ -124,6 +130,7 @@ export function useGenerationApi(): UseGenerationApiReturn {
             hasManualEdits,
             errorCorrection,
             frameImages,
+            availableAssets,
           }),
         });
 

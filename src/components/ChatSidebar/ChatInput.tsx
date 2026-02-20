@@ -10,9 +10,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { captureFrame } from "@/helpers/capture-frame";
-import { useImageAttachments } from "@/hooks/useImageAttachments";
+import {
+  useMediaAttachments,
+  type AttachedFile,
+} from "@/hooks/useMediaAttachments";
 import { MODELS, type ModelId } from "@/types/generation";
-import { ArrowUp, Camera, Paperclip, X } from "lucide-react";
+import { ArrowUp, Camera, Film, Music, Paperclip, X } from "lucide-react";
 import { useEffect, useState, type ComponentType } from "react";
 
 interface ChatInputProps {
@@ -21,12 +24,53 @@ interface ChatInputProps {
   model: ModelId;
   onModelChange: (model: ModelId) => void;
   isLoading: boolean;
-  onSubmit: (attachedImages?: string[]) => void;
+  onSubmit: (attachedFiles?: AttachedFile[]) => void;
   // Frame capture props
   Component?: ComponentType | null;
   fps?: number;
   durationInFrames?: number;
   currentFrame?: number;
+}
+
+function FilePreview({
+  file,
+  index,
+  onRemove,
+}: {
+  file: AttachedFile;
+  index: number;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <div className="relative flex-shrink-0">
+      {file.type === "image" && file.base64 ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={file.base64}
+          alt={file.name}
+          className="h-16 w-16 rounded border border-border object-cover"
+        />
+      ) : (
+        <div className="h-16 w-16 rounded border border-border bg-secondary/50 flex flex-col items-center justify-center gap-1">
+          {file.type === "video" ? (
+            <Film className="w-5 h-5 text-muted-foreground" />
+          ) : (
+            <Music className="w-5 h-5 text-muted-foreground" />
+          )}
+          <span className="text-[8px] text-muted-foreground-dim truncate max-w-[56px] px-1">
+            {file.name}
+          </span>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => onRemove(index)}
+        className="absolute -top-1.5 -right-1.5 bg-background border border-border rounded-full p-0.5 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
 }
 
 export function ChatInput({
@@ -43,12 +87,12 @@ export function ChatInput({
 }: ChatInputProps) {
   const [isCapturing, setIsCapturing] = useState(false);
   const {
-    attachedImages,
+    attachedFiles,
     isDragging,
     fileInputRef,
-    addImages,
-    removeImage,
-    clearImages,
+    addImageFromBase64,
+    removeFile,
+    clearFiles,
     handleFileSelect,
     handlePaste,
     handleDragOver,
@@ -57,7 +101,7 @@ export function ChatInput({
     canAddMore,
     error,
     clearError,
-  } = useImageAttachments();
+  } = useMediaAttachments();
 
   // Auto-clear error after 5 seconds
   useEffect(() => {
@@ -70,8 +114,8 @@ export function ChatInput({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) return;
-    onSubmit(attachedImages.length > 0 ? attachedImages : undefined);
-    clearImages();
+    onSubmit(attachedFiles.length > 0 ? attachedFiles : undefined);
+    clearFiles();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -93,7 +137,7 @@ export function ChatInput({
         fps,
         durationInFrames,
       });
-      addImages([base64]);
+      addImageFromBase64(base64);
     } catch (error) {
       console.error("Failed to capture frame:", error);
     } finally {
@@ -125,32 +169,19 @@ export function ChatInput({
             />
           )}
 
-          {/* Image previews */}
-          {attachedImages.length > 0 && (
+          {/* File previews */}
+          {attachedFiles.length > 0 && (
             <div className="mb-2">
               <div className="flex gap-2 overflow-x-auto pb-1 pt-2">
-                {attachedImages.map((img, index) => (
-                  <div key={index} className="relative flex-shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={img}
-                      alt={`Attached ${index + 1}`}
-                      className="h-16 w-16 rounded border border-border object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(index)}
-                      className="absolute -top-1.5 -right-1.5 bg-background border border-border rounded-full p-0.5 hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
+                {attachedFiles.map((file, index) => (
+                  <FilePreview
+                    key={index}
+                    file={file}
+                    index={index}
+                    onRemove={removeFile}
+                  />
                 ))}
               </div>
-              <p className="text-[10px] text-muted-foreground-dim mt-1">
-                Images for reference only, they cannot be embedded in the
-                animation
-              </p>
             </div>
           )}
 
@@ -161,8 +192,8 @@ export function ChatInput({
             onPaste={handlePaste}
             placeholder={
               isDragging
-                ? "Drop images here..."
-                : "Tune your animation... (paste or drop images)"
+                ? "Drop files here..."
+                : "Tune your animation... (paste or drop media files)"
             }
             className="w-full bg-transparent text-foreground placeholder:text-muted-foreground-dim focus:outline-none resize-none text-sm min-h-[36px] max-h-[120px]"
             style={{ fieldSizing: "content" } as React.CSSProperties}
@@ -172,7 +203,7 @@ export function ChatInput({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,video/*,audio/*,.mp4,.webm,.mov,.mp3,.wav,.ogg,.aac"
             multiple
             onChange={handleFileSelect}
             className="hidden"
@@ -208,7 +239,7 @@ export function ChatInput({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading || !canAddMore}
                 className="text-muted-foreground hover:text-foreground h-7 w-7"
-                title="Attach images"
+                title="Attach media"
               >
                 <Paperclip className="w-4 h-4" />
               </Button>

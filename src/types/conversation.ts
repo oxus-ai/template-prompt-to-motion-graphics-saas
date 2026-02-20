@@ -16,6 +16,11 @@ export interface AssistantMetadata {
   model?: string;
 }
 
+export interface MediaAttachmentMeta {
+  name: string;
+  type: "image" | "video" | "audio";
+}
+
 export interface ConversationMessage {
   id: string;
   role: "user" | "assistant" | "error";
@@ -23,6 +28,8 @@ export interface ConversationMessage {
   timestamp: number;
   /** For user messages, store attached images as base64 data URLs */
   attachedImages?: string[];
+  /** For user messages, store metadata about all attached media files */
+  attachedMedia?: MediaAttachmentMeta[];
   /** For assistant messages, store the code snapshot at time of generation */
   codeSnapshot?: string;
   /** For assistant messages, store metadata about the generation */

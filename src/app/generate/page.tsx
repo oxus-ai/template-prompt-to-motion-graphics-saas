@@ -13,6 +13,7 @@ import { examples } from "../../examples/code";
 import { useAnimationState } from "../../hooks/useAnimationState";
 import { useAutoCorrection } from "../../hooks/useAutoCorrection";
 import { useConversationState } from "../../hooks/useConversationState";
+import { useMediaAssets } from "../../hooks/useMediaAssets";
 import type {
   AssistantMetadata,
   EditOperation,
@@ -68,6 +69,9 @@ function GeneratePageContent() {
     clearPendingMessage,
     isFirstGeneration,
   } = useConversationState();
+
+  // Media assets state (filename → blob URL map)
+  const mediaAssets = useMediaAssets();
 
   // Sidebar collapse state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -137,9 +141,9 @@ function GeneratePageContent() {
     // Compile when streaming ends - mark as AI change
     if (wasStreaming && !isStreaming) {
       markAsAiGenerated();
-      compileCode(codeRef.current);
+      compileCode(codeRef.current, mediaAssets.assets);
     }
-  }, [isStreaming, compileCode, markAsAiGenerated]);
+  }, [isStreaming, compileCode, markAsAiGenerated, mediaAssets.assets]);
 
   const handleCodeChange = useCallback(
     (newCode: string) => {
@@ -164,7 +168,7 @@ function GeneratePageContent() {
 
       // Set new debounce
       debounceRef.current = setTimeout(() => {
-        compileCode(newCode);
+        compileCode(newCode, mediaAssets.assets);
       }, 500);
     },
     [setCode, compileCode, markManualEdit, markAsUserEdited],
@@ -172,8 +176,16 @@ function GeneratePageContent() {
 
   // Handle message sent for history
   const handleMessageSent = useCallback(
-    (promptText: string, attachedImages?: string[]) => {
-      addUserMessage(promptText, attachedImages);
+    (
+      promptText: string,
+      attachedImages?: string[],
+      attachedMedia?: Array<{ name: string; type: string }>,
+    ) => {
+      const mediaMeta = attachedMedia?.map((m) => ({
+        name: m.name,
+        type: m.type as "image" | "video" | "audio",
+      }));
+      addUserMessage(promptText, attachedImages, mediaMeta);
     },
     [addUserMessage],
   );
@@ -278,6 +290,14 @@ function GeneratePageContent() {
           errorCorrection={errorCorrection ?? undefined}
           onPendingMessage={setPendingMessage}
           onClearPendingMessage={clearPendingMessage}
+          onFilesAttached={(files) => {
+            const resolved = mediaAssets.addFiles(files);
+            return resolved.map((a) => ({ name: a.name, type: a.type }));
+          }}
+          allAvailableAssets={mediaAssets.assetList.map((a) => ({
+            name: a.name,
+            type: a.type,
+          }))}
           // Frame capture props
           Component={Component}
           fps={fps}
